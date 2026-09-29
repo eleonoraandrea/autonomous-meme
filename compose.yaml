@@ -1,0 +1,36 @@
+services:
+  discovery:
+    build: .
+    command: ["python", "-m", "meme_paper", "discover"]
+    env_file: .env
+    environment:
+      MODE: paper
+      PAPER_DB: /app/data/paper.sqlite3
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+  paper:
+    build: .
+    env_file: .env
+    environment:
+      PAPER_DB: /app/data/paper.sqlite3
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - discovery
+    restart: unless-stopped
+  web:
+    build: .
+    command: ["python", "-m", "meme_paper", "web"]
+    environment:
+      MODE: paper
+      PAPER_DB: /app/data/paper.sqlite3
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: ${WEB_PORT:-8080}
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:${WEB_PORT:-8080}"
+    depends_on:
+      - paper
+    restart: unless-stopped
