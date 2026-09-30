@@ -242,6 +242,7 @@ function render(data) {
     'I limiti di portafoglio consentono nuove entrate se anche mercato e strategia superano i propri controlli. Gli stop non garantiscono l’uscita.';
   byId('observations').textContent=number(data.observations);
   byId('fills').textContent=number(data.fills);
+  const badge=byId('open-trades-count');badge.textContent=number(data.fills);badge.hidden=data.fills===0;
   byId('feed-age').textContent=age(lag);
   byId('feed-note').textContent=lag == null ? 'Nessuna osservazione' : 'Dall’ultima osservazione';
   byId('market-count').textContent=number(data.markets.length)+' MERCATI';
@@ -382,6 +383,58 @@ function setHistoryKind(kind) {
   document.querySelectorAll('.history-chip').forEach(button=>{const active=button.dataset.historyKind===kind;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
   refreshHistory();
 }
+const tradesDialog=byId('trades-dialog');
+let opsPage=1,opsAnchor=null,lastOpsAnchor=0,opsRequest=0;
+function opsChip(label,value,cls){const s=document.createElement('span');s.textContent=label+' ';const b=document.createElement('strong');b.textContent=value;if(cls)b.className=cls;s.append(b);return s;}
+function renderOperations(data){
+  lastOpsAnchor=data.anchor;
+  const totalPages=Math.max(1,Math.ceil(data.total/data.page_size));
+  const s=data.summary;
+  byId('ops-status').textContent=`${number(data.total)} operazioni · ${opsAnchor==null?'live':'istantanea congelata'} · aggiornamento ogni 5s`;
+  byId('ops-summary').replaceChildren(
+    opsChip('OPERAZIONI',number(s.buys+s.sells)),
+    opsChip('BUY',number(s.buys)),
+    opsChip('SELL',number(s.sells)),
+    opsChip('P&L NETO EPISODI CHIUSI',(s.closed_pnl_usd>=0?'+':'')+money(s.closed_pnl_usd),s.closed_pnl_usd>=0?'up':'down'),
+    opsChip('FEE TOTALI',money(s.fees_usd),'neutral'),
+    opsChip('POSIZIONI APERTE',number(s.open_positions)),
+    opsChip('USCITE NON ESEGUIBILI',number(s.unfilled_exits)));
+  byId('ops-page').textContent=`Pagina ${data.page} / ${totalPages}`;
+  byId('ops-prev').disabled=data.page<=1;
+  byId('ops-next').disabled=data.page>=totalPages;
+  byId('ops-live').hidden=opsAnchor==null;
+  const body=byId('ops-rows');body.replaceChildren();
+  if(!data.items.length){emptyRow(body,'Nessuna operazione paper registrata.',8);return;}
+  for(const f of data.items){
+    const tr=document.createElement('tr');
+    cell(tr,new Date(f.received_at).toISOString().replace('T',' ').slice(0,19),'history-time');
+    const token=cell(tr,'');const strong=document.createElement('strong');strong.textContent=f.symbol;
+    const mint=document.createElement('small');mint.textContent=f.mint;mint.title=f.mint;token.append(strong,mint);
+    const side=cell(tr,'');const badge=document.createElement('span');badge.className='pill '+f.side;badge.textContent=f.side;side.append(badge);
+    cell(tr,Number(f.units).toLocaleString('it-IT',{maximumFractionDigits:6}),'numeric');
+    cell(tr,price(f.price),'numeric');
+    cell(tr,(f.cash_delta>=0?'+':'')+money(f.cash_delta),'numeric '+(f.cash_delta>=0?'up':'down'));
+    cell(tr,money(f.fee),'numeric neutral');
+    const ep=cell(tr,'');const info=document.createElement('span');info.className='history-reason';
+    if(f.side==='BUY'){info.textContent=f.episode_state?`stato ${f.episode_state} · ${f.episode_status}`:'posizione non-RL';info.className+=' neutral';}
+    else if(f.episode_reward==null){info.textContent='chiusura senza episodio RL';info.className+=' neutral';}
+    else{info.textContent=`reward netto ${(f.episode_reward*100).toFixed(2)}%`;info.className+=' '+(f.episode_reward>=0?'up':'down');}
+    ep.append(info);body.append(tr);
+  }
+}
+async function refreshOperations(){
+  const seq=++opsRequest;
+  const query=new URLSearchParams({page:String(opsPage)});
+  if(opsAnchor!=null)query.set('anchor',String(opsAnchor));
+  try{
+    const response=await fetch('/api/operations?'+query,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    if(seq===opsRequest)renderOperations(data);
+  }catch(error){
+    if(seq===opsRequest)byId('ops-status').textContent='Storico temporaneamente non disponibile: '+error.message;
+  }
+}
 byId('market-search').addEventListener('input',()=>{if(currentData&&!currentData.missing)renderMarketRows(currentData);});
 byId('market-sort').addEventListener('change',()=>{if(currentData&&!currentData.missing)renderMarketRows(currentData);});
 document.querySelectorAll('.filter-chip').forEach(button=>button.addEventListener('click',()=>{
@@ -396,6 +449,13 @@ byId('history-next').addEventListener('click',()=>{historyAnchor??=lastHistoryAn
 byId('history-live').addEventListener('click',()=>{historyPage=1;historyAnchor=null;refreshHistory();});
 byId('rl-load-older').addEventListener('click',loadOlderEvaluations);
 byId('rl-follow-live').addEventListener('click',()=>{followLive=true;if(evaluations.length)selectEvaluation(evaluations[0],true);byId('rl-follow-live').hidden=true;});
+function openOperations(){opsPage=1;opsAnchor=null;tradesDialog.showModal();refreshOperations();}
+byId('open-trades').addEventListener('click',openOperations);
+byId('trades-close').addEventListener('click',()=>tradesDialog.close());
+tradesDialog.addEventListener('click',event=>{if(event.target===tradesDialog)tradesDialog.close();}); // click sul backdrop
+byId('ops-prev').addEventListener('click',()=>{if(opsPage>1){opsPage--;if(opsPage===1)opsAnchor=null;refreshOperations();}});
+byId('ops-next').addEventListener('click',()=>{opsAnchor??=lastOpsAnchor;opsPage++;refreshOperations();});
+byId('ops-live').addEventListener('click',()=>{opsPage=1;opsAnchor=null;refreshOperations();});
 window.addEventListener('beforeunload',()=>stream?.close());
 async function refreshStatus() {
   try {

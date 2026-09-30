@@ -45,3 +45,24 @@ button{font:inherit}a{color:inherit}.shell{max-width:1440px;margin:auto;padding:
 @media(max-width:1000px){.funnel-steps{grid-template-columns:1fr}}
 @media(max-width:650px){.funnel-step{grid-template-columns:minmax(0,1fr) 46px;grid-auto-rows:auto;gap:3px 8px}.funnel-step i{display:none}.funnel-step small{text-align:left}.funnel-heading{padding:16px 14px}.funnel-steps{padding:10px 14px 12px}.funnel-reasons{padding:10px 14px}}
 @media(prefers-reduced-motion:reduce){.funnel-step i b{transition:none}}
+
+/* Operations history: the real fills ledger, opened on demand, pinned like the decision log. */
+.ledger-button{border:1px solid var(--lime);background:transparent;color:var(--lime);font:10px var(--mono);letter-spacing:.09em;padding:8px 13px;cursor:pointer}.ledger-button:hover,.ledger-button:focus-visible{background:var(--lime);color:#1b2917}.ledger-button span{border-left:1px solid currentColor;margin-left:9px;padding-left:9px;font-variant-numeric:tabular-nums}
+#trades-dialog{border:1px solid var(--line);background:var(--panel);color:var(--cream);padding:0;width:min(1180px,96vw);max-height:88vh;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+#trades-dialog::backdrop{background:rgba(6,10,7,.74)}
+.trades-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px;border-bottom:1px solid var(--line)}
+.trades-head h2{font-family:var(--serif);font-weight:400;font-size:clamp(24px,2.6vw,33px);line-height:1.12;margin:0}
+.trades-head p{margin:9px 0 0;max-width:60ch}
+.trades-head-side{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
+.trades-head-side #ops-status{font-size:10px;color:var(--muted);text-align:right}
+#trades-close{border:1px solid var(--line);background:transparent;color:var(--cream);font:10px var(--mono);letter-spacing:.08em;padding:8px 12px;cursor:pointer}
+#trades-close:hover,#trades-close:focus-visible{border-color:var(--lime);color:var(--lime)}
+.trades-summary{display:flex;flex-wrap:wrap;gap:7px 22px;padding:12px 24px;border-bottom:1px solid var(--line);background:#202b22}
+.trades-summary span{font-size:9px;color:var(--muted);letter-spacing:.07em}
+.trades-summary strong{font-weight:400;font-size:12px;color:var(--cream);font-variant-numeric:tabular-nums}
+.trades-scroll{max-height:min(46vh,460px);overflow-y:auto;scrollbar-color:var(--line) transparent}
+.trades-table{min-width:840px}
+.trades-table th,.trades-table td{padding-left:8px;padding-right:8px}
+.trades-table td:nth-child(2){max-width:170px}.trades-table td:nth-child(2) strong{display:block;color:var(--cream);font-size:12px}.trades-table td:nth-child(2) small{display:block;color:var(--muted);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trades-table td:last-child{min-width:190px}
+@media(max-width:650px){.section-divider{flex-wrap:wrap;gap:10px}.ledger-button{order:3}.trades-head{flex-direction:column;padding:16px 14px}.trades-head-side{align-items:flex-start;width:100%}.trades-summary{padding:10px 14px}.trades-table{min-width:820px}}

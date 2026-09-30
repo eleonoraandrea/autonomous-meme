@@ -20,7 +20,7 @@ from meme_paper.web import handler_for
 from meme_paper.config import load_env
 from meme_paper.rl import EntryPolicy, state_key
 from meme_paper.analytics import analyze_samples, cohort_summary
-from meme_paper.history import load_history, read_rl_events
+from meme_paper.history import load_history, load_operations, read_rl_events
 from meme_paper.discovery import parse_creation
 
 T0 = 1_780_000_000_000
@@ -301,6 +301,33 @@ class PaperTests(unittest.TestCase):
         self.assertEqual(load_history(path, "all", 1)["total"], 27)
         with self.assertRaises(ValueError):
             load_history(path, "bad-kind")
+
+    def test_operations_history_lists_fills_with_episode_outcome(self):
+        path = str(Path(self.tmp.name) / 'paper.db')
+        self.engine.on_snapshot(snapshot())
+        self.engine.on_snapshot(snapshot(time=T0 + 20_000, price=1.05))  # BUY
+        self.assertEqual(load_operations(path)['total'], 1)
+        self.engine.on_snapshot(snapshot(time=T0 + 40_000, price=1.4))  # SELL take-profit
+        page = load_operations(path)
+        self.assertEqual(page['total'], 2)
+        sell, buy = page['items']  # most-recent first
+        self.assertEqual(sell['side'], 'SELL')
+        self.assertIsNotNone(sell['episode_reward'])
+        self.assertEqual(buy['side'], 'BUY')
+        self.assertEqual(buy['episode_state'], sell['episode_state'])
+        summary = page['summary']
+        self.assertEqual((summary['buys'], summary['sells']), (1, 1))
+        self.assertGreater(summary['fees_usd'], 0)
+        self.assertAlmostEqual(summary['closed_pnl_usd'], sell['episode_reward'] * buy['entry_cost'], places=4)
+        self.assertEqual(summary['open_positions'], 0)
+        anchor = page['anchor']
+        self.engine.on_snapshot(snapshot(time=T0 + 60_000, mint='mint2', pair='pair2'))
+        self.engine.on_snapshot(snapshot(time=T0 + 80_000, mint='mint2', pair='pair2', price=1.05))  # BUY
+        pinned = load_operations(path, 1, anchor)  # Pinned page must not shift with new fills.
+        self.assertEqual([item['id'] for item in pinned['items']], [item['id'] for item in page['items']])
+        self.assertEqual(load_operations(path)['total'], 3)
+        with self.assertRaises(ValueError):
+            load_operations(path, 0)
 
     def test_sse_pushes_each_committed_rl_evaluation(self):
         path = str(Path(self.tmp.name) / "paper.db")

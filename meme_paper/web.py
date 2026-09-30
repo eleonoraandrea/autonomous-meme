@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from .tui import load_dashboard, load_token_analysis
-from .history import load_history, read_rl_events
+from .history import load_history, load_operations, read_rl_events
 
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
@@ -68,6 +68,21 @@ def handler_for(db_path: str):
                                       allow_nan=False).encode()
                 except ValueError:
                     self.respond(400, b'{"error":"invalid mint"}', "application/json")
+                    return
+                except sqlite3.Error:
+                    self.respond(503, b'{"error":"database unavailable"}', "application/json")
+                    return
+                self.respond(200, body, "application/json")
+            elif path == "/api/operations":
+                try:
+                    query = parse_qs(request.query, keep_blank_values=True)
+                    if set(query) - {"page", "anchor"} or any(len(values) != 1 for values in query.values()):
+                        raise ValueError("invalid query")
+                    page = int(query.get("page", ["1"])[0])
+                    anchor = int(query["anchor"][0]) if "anchor" in query else None
+                    body = json.dumps(load_operations(db_path, page, anchor), allow_nan=False).encode()
+                except ValueError:
+                    self.respond(400, b'{"error":"invalid operations query"}', "application/json")
                     return
                 except sqlite3.Error:
                     self.respond(503, b'{"error":"database unavailable"}', "application/json")
